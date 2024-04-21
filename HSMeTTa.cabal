@@ -60,6 +60,7 @@ library
 
     -- Modules exported by the library.
     exposed-modules:  OpenCog.MeTTa
+                      , OpenCog.MeTTa.Parser
 
     -- Modules included in this library but not exported.
     other-modules: OpenCog.MeTTa.Lib
@@ -70,6 +71,9 @@ library
     -- Other library packages from which modules are imported.
     build-depends:  base >= 4.7 && < 5
                     , containers
+                    , Iso
+                    , transformers
+                    , mtl
 
     -- Directories containing source files.
     hs-source-dirs:   lib
@@ -77,9 +81,18 @@ library
     -- Base language which the package is written in.
     default-language: GHC2021
 
-
-executable toMeTTa
+executable hsmToMeTTa
   hs-source-dirs:      app
+  main-is:             Main.hs
+  build-depends:       base
+                     , HSMeTTa
+                     , Iso
+                     , transformers
+                     , mtl
+  default-language:    GHC2021
+
+executable MeTTaTohsm
+  hs-source-dirs:      app2
   main-is:             Main.hs
   build-depends:       base
                      , HSMeTTa

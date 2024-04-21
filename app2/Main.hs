@@ -9,8 +9,8 @@ main :: IO ()
 main = do
     [dir,path] <- getArgs
     file <- readFile path
-    case M.evalStateT (apply parseFile ()) (State {sText = file}) of
-        Right as -> case M.execStateT (unapply parseMeTTa as) (State {sText = ""}) of
+    case M.evalStateT (apply parseMeTTa ()) (State {sText = file}) of
+        Right a -> case M.execStateT (unapply parseFile a) (State {sText = ""}) of
                         Right s -> putStrLn $ sText s
                         Left e -> print e
         Left e -> print e
