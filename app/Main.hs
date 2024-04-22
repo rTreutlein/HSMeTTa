@@ -7,7 +7,7 @@ import System.Environment
 
 main :: IO ()
 main = do
-    [dir,path] <- getArgs
+    [path] <- getArgs
     file <- readFile path
     case M.evalStateT (apply parseFile ()) (State {sText = file}) of
         Right as -> case M.execStateT (unapply parseMeTTa as) (State {sText = ""}) of

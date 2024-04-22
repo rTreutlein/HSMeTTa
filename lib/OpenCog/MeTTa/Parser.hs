@@ -41,6 +41,9 @@ node = (text "$" >>> anyWord >>> variable) <+> (anyWord >>> symbol)
 parseExpr :: Syntax Atom
 parseExpr = text "(" <&& optSpace >>> many (parseExpr <+> node) <&& text ")" <&& skip1 >>> expr
 
+parseExprH :: Syntax Atom
+parseExprH = text "(" <&& optSpace >>> many (parseExprH <+> hnode <+> node) <&& text ")" <&& skip1 >>> expr
+
 parseEval :: Syntax Atom
 parseEval = text "!" &&> parseExpr >>> eval
 
@@ -51,7 +54,7 @@ parseMeTTa = skip &&> some (comment &&> (parseEval <+> parseExpr) <&& skip)
 
 specialList = ["==","->",":","=","+","-","/","*"]
 
-forbidden = " \n()"
+forbidden = " \n()[]"
 forbidden2 = ["if","then","else"]
 
 anyOf :: [a] -> (a -> Syntax b) -> Syntax b
@@ -62,7 +65,7 @@ anyhWord :: Syntax String
 anyhWord = (some (token (`notElem` forbidden)) <&& optSpace) >>> isoFilter (`notElem` specialList ++ forbidden2)
 
 hnode :: Syntax Atom
-hnode = (text "$" >>> anyhWord >>> variable) <+> (anyhWord >>> symbol) <+> (text "(" <&& optSpace >>> specialExpr <&& text ")" <&& optSpace) <+> parseExpr
+hnode = (text "$" >>> anyhWord >>> variable) <+> (anyhWord >>> symbol) <+> (text "[" <&& optSpace >>> anyExpr <&& text "]" <&& optSpace) <+> parseExprH
 
 special :: Syntax Atom
 special = anyOf specialList string <&& skipSpace >>> symbol
