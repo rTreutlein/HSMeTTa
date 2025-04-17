@@ -52,7 +52,7 @@ parseMeTTa = skip &&> some (comment &&> (parseEval <+> parseExpr) <&& skip)
 
 -------------------------------------------------------------------------------
 
-specialList = ["==","->",":","=","+","-","/","*"]
+specialList = ["==","->",":","=","+","-","/","*","∧","∨"]
 
 forbidden = " \n()[]"
 forbidden2 = ["if","then","else"]

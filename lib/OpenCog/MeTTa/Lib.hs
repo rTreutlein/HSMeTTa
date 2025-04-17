@@ -46,6 +46,7 @@ isTV _ = False
 
 isLink :: Atom -> Bool
 isLink (Expr (_:mtv:_)) = isTV mtv
+isLink _ = False
 
 atomGetAllNodes :: Atom -> [Atom]
 atomGetAllNodes atom@(Link _ as _) = if isLink atom 
@@ -57,16 +58,19 @@ nodeName :: Atom -> String
 nodeName (Symbol n) = n
 nodeName (Variable n) = n
 nodeName (Expr (_:(Symbol n):_)) = n
+nodeName a = error $ "nodeName doesn't work for" ++ show a
 
 atomFold :: (a -> Atom -> a) -> a -> Atom -> a
 atomFold f v a@(Symbol _) = f v a
 atomFold f v a@(Variable _) = f v a
 atomFold f v a@(Expr (_:_:ls)) = if isLink a then f (foldl (atomFold f) v ls) a else f v a
+atomFold f v a@(Expr ls) = f (foldl (atomFold f) v ls) a
 
 atomMap :: (Atom -> Atom) -> Atom -> Atom
 atomMap f n@(Symbol _) = f n
 atomMap f n@(Variable _) = f n
-atomMap f n@(Link t ls tv) = if isLink n then f $ Link t (map (atomMap f) ls) tv else f n
+--atomMap f n@(Link t ls tv) = if isLink n then f $ Link t (map (atomMap f) ls) tv else f n
+atomMap f (Expr ls) = Expr $ map (atomMap f) ls
 
 showAtom :: Atom -> String
 showAtom (Symbol n) = n
@@ -79,8 +83,9 @@ showAtomese (Symbol n) = n
 showAtomese (Variable n) = "$" ++ n
 showAtomese a@(Expr as) = if isLink a || isTV a
                         then "( " ++ unwords (map showAtomese as)  ++ " )"
-                        else let Node _ n _ = a
-                             in n
+                        else case a of
+                                Node _ n _ -> n
+                                _ -> showAtom a
 
 atomElem :: Atom -> Atom -> Bool
 atomElem n a@(Expr ls) = atomFold (\b a -> a == n || b) False a
