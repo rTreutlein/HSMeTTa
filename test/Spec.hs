@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Control.Monad (forM_)
 import qualified Control.Monad.State as M
 import GHC.Stack (HasCallStack)
 import Iso (apply, unapply)
@@ -10,25 +11,40 @@ import Test.Hspec
 main :: IO ()
 main = hspec spec
 
+fixtures :: [(String, String)]
+fixtures =
+    [ ( "fun $x = 1 + $x"
+      , "(= (fun $x) (+ 1 $x))"
+      ),
+      ( "fun $x = if $x == 1 then a else b"
+      , "(= (fun $x) (if (== $x 1) a b))"
+      ),
+      ( "fun $x = case $x of\
+        \                Nothing -> a\
+        \                (Just $y) -> $y"
+      , "(= (fun $x) (case $x ((Nothing a) ((Just $y) $y))))"
+      )
+    ]
+
 spec :: Spec
 spec = describe "MeTTa/HSM conversion" $ do
-    it "produces the MeTTa fixture when converting from the HSM fixture" $ do
-        hsmSource <- readFile "test.hsmetta"
-        mettaSource <- readFile "test.metta"
-        expectRight (parseMettaText mettaSource) $ \expectedAtoms ->
-            expectRight (parseHsmText hsmSource) $ \hsmAtoms ->
-                expectRight (renderMettaText hsmAtoms) $ \convertedMetta ->
-                    expectRight (parseMettaText convertedMetta) $ \roundTripAtoms ->
-                        roundTripAtoms `shouldBe` expectedAtoms
+    forM_
+        (zip [1 :: Int ..] fixtures)
+        $ \(fixtureIdx, (hsmSource, mettaSource)) -> do
+            let fixtureLabel = "fixture #" ++ show fixtureIdx
+            describe fixtureLabel $ do
+                it "parses HSM and MeTTa sources to the same atoms" $ do
+                    expectRight (parseMettaText mettaSource) $ \expectedAtoms ->
+                        expectRight (parseHsmText hsmSource) $ \hsmAtoms ->
+                            hsmAtoms `shouldBe` expectedAtoms
 
-    it "produces the HSM fixture when converting from the MeTTa fixture" $ do
-        mettaSource <- readFile "test.metta"
-        hsmSource <- readFile "test.hsmetta"
-        expectRight (parseHsmText hsmSource) $ \expectedAtoms ->
-            expectRight (parseMettaText mettaSource) $ \mettaAtoms ->
-                expectRight (renderHsmText mettaAtoms) $ \convertedHsm ->
-                    expectRight (parseHsmText convertedHsm) $ \roundTripAtoms ->
-                        roundTripAtoms `shouldBe` expectedAtoms
+                it "preserves atoms when rendered to HSM and parsed back" $ do
+                    expectRight (parseHsmText hsmSource) $
+                        roundTripAtoms renderHsmText parseHsmText
+
+                it "preserves atoms when rendered to MeTTa and parsed back" $ do
+                    expectRight (parseMettaText mettaSource) $
+                        roundTripAtoms renderMettaText parseMettaText
 
 parseHsmText :: String -> Either String [Atom]
 parseHsmText input =
@@ -51,3 +67,9 @@ expectRight value f =
     case value of
         Right a -> f a
         Left err -> expectationFailure ("expected Right but got Left: " ++ show err)
+
+roundTripAtoms :: (HasCallStack, Show e1, Show e2) => ([Atom] -> Either e1 String) -> (String -> Either e2 [Atom]) -> [Atom] -> Expectation
+roundTripAtoms render parse atoms =
+    expectRight (render atoms) $ \rendered ->
+        expectRight (parse rendered) $ \roundTripped ->
+            roundTripped `shouldBe` atoms
