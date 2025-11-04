@@ -81,18 +81,8 @@ library
     -- Base language which the package is written in.
     default-language: GHC2021
 
-executable hsmToMeTTa
+executable hsmetta
   hs-source-dirs:      app
-  main-is:             Main.hs
-  build-depends:       base
-                     , HSMeTTa
-                     , Iso
-                     , transformers
-                     , mtl
-  default-language:    GHC2021
-
-executable MeTTaTohsm
-  hs-source-dirs:      app2
   main-is:             Main.hs
   build-depends:       base
                      , HSMeTTa
