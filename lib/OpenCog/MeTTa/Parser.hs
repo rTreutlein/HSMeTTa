@@ -13,6 +13,10 @@ import Control.Arrow
 
 import OpenCog.MeTTa.Lib
 
+import Data.Char (isSpace)
+import Data.List (isPrefixOf, stripPrefix)
+import Data.Maybe (listToMaybe)
+
 import Debug.Trace
 
 newtype State = State {sText :: String}
@@ -55,7 +59,7 @@ parseMeTTa = skip &&> some (comment &&> (parseEval <+> parseExpr) <&& skip)
 specialList = ["==","->",":","=","+","-","/","*","∧","∨"]
 
 forbidden = " \n()[]"
-forbidden2 = ["if","then","else"]
+forbidden2 = ["if","then","else","case","of"]
 
 anyOf :: [a] -> (a -> Syntax b) -> Syntax b
 anyOf [] _ = fail
@@ -109,7 +113,106 @@ ifExpr = (specialSymbol "if" &&&
             )
           ) >>> cons >>> expr
 
-anyExpr = ifExpr <+> specialExpr <+> cExpr
+caseExpr :: Syntax Atom
+caseExpr =
+    ( specialSymbol "case"
+        &&& ( ((anyExpr <&& caseOf) &&& caseBranches) >>> tolist2 )
+    ) >>> cons >>> expr
+
+caseOf :: Syntax ()
+caseOf = syntax parse print
+    where
+        parse text =
+            let rest = dropWhile (== ' ') text
+            in case stripPrefix "of" rest of
+                Just remaining -> Right ((), remaining)
+                Nothing -> Left "expected 'of' in case expression"
+        print () = Right " of"
+
+caseBranches :: Syntax Atom
+caseBranches = some caseBranch >>> expr
+
+caseBranch :: Syntax Atom
+caseBranch = syntax parseBranch printBranch
+
+patternExpr :: Syntax Atom
+patternExpr = cExpr
+
+parseBranch :: String -> Either String (Atom, String)
+parseBranch input = do
+    let (indent, rest0) = span (`elem` " \n") input
+    if null indent
+        then Left "expected indentation before case branch"
+        else do
+            (patAtom, rest1) <- runSyntax patternExpr rest0
+            let rest2 = dropWhile (== ' ') rest1
+            rest3 <- stripArrow rest2
+            let (bodyChunk, rest4) = splitBodyText rest3
+            bodyAtom <- parseBodyAtom bodyChunk
+            pure (Expr [patAtom, bodyAtom], rest4)
+
+printBranch :: Atom -> Either String String
+printBranch (Expr [patAtom, bodyAtom]) = do
+    patText <- renderWith patternExpr patAtom
+    bodyText <- renderWith anyExpr bodyAtom
+    pure ("\n    " ++ patText ++ " -> " ++ bodyText)
+printBranch _ = Left "expected branch expression"
+
+stripArrow :: String -> Either String String
+stripArrow text =
+    case stripPrefix "->" text of
+        Just rest -> Right (dropWhile (== ' ') rest)
+        Nothing -> Left "expected '->' in case branch"
+
+parseBodyAtom :: String -> Either String Atom
+parseBodyAtom text = do
+    let bodyText = rstrip text
+    (bodyAtom, rest) <- runSyntax anyExpr bodyText
+    if all isSpace rest
+        then Right bodyAtom
+        else Left "unexpected content after case branch body"
+
+splitBodyText :: String -> (String, String)
+splitBodyText text =
+    case findNextBranchStart text of
+        Just idx -> let (bodyPart, rest) = splitAt idx text in (rstrip bodyPart, rest)
+        Nothing -> (rstrip text, "")
+
+findNextBranchStart :: String -> Maybe Int
+findNextBranchStart text =
+    listToMaybe
+        [ idx
+        | idx <- candidateIndices
+        , let sub = drop idx text
+              spaceCount = length (takeWhile (== ' ') sub)
+        , spaceCount >= 2
+        , startsWithBranch (drop spaceCount sub)
+        ]
+    where
+        candidateIndices = [i | (i, c) <- zip [0 ..] text, c == ' ']
+
+startsWithBranch :: String -> Bool
+startsWithBranch txt =
+    case runSyntax patternExpr txt of
+        Right (_, rest) ->
+            let rest' = dropWhile (== ' ') rest
+            in isPrefixOf "->" rest'
+        Left _ -> False
+
+runSyntax :: Syntax Atom -> String -> Either String (Atom, String)
+runSyntax syn str =
+    case M.runStateT (apply syn ()) (State str) of
+        Right (atom, st) -> Right (atom, sText st)
+        Left err -> Left err
+
+renderWith :: Syntax Atom -> Atom -> Either String String
+renderWith syn atom =
+    fmap sText $ M.execStateT (unapply syn atom) (State "")
+
+rstrip :: String -> String
+rstrip = reverse . dropWhile isSpace . reverse
+
+anyExpr = ifExpr <+> caseExpr <+> specialExpr <+> cExpr
 
 parseHexpr = (text "!" &&> anyExpr >>> eval) <+> anyExpr
 
@@ -117,5 +220,3 @@ comment = many ((text ";" &&> manyTill anytoken (text "\n") <&& skipLine) >>> ig
 
 parseFile :: Syntax [Atom]
 parseFile = skip &&> some (comment &&> parseHexpr <&& skip)
-
-
