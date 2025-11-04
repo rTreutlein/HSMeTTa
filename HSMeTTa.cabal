@@ -100,3 +100,16 @@ executable MeTTaTohsm
                      , transformers
                      , mtl
   default-language:    GHC2021
+
+test-suite hsmetta-test
+  import:              warnings
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , HSMeTTa
+                     , Iso
+                     , hspec
+                     , transformers
+                     , mtl
+  default-language:    GHC2021
