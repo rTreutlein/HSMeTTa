@@ -23,6 +23,19 @@ fixtures =
         \                Nothing -> a\
         \                (Just $y) -> $y"
       , "(= (fun $x) (case $x ((Nothing a) ((Just $y) $y))))"
+      ),
+      ("fold-nested $f $init ( cons $x $xs ) = \
+       \    if is-expr $x\
+       \        then fold-nested $f ( fold-nested $f $init $x ) $xs\
+       \        else fold-nested $f ( $f $init $x ) $xs"
+      ,"(= (fold-nested $f $init (cons $x $xs))\
+       \    (if (is-expr $x)\
+       \        (fold-nested $f (fold-nested $f $init $x) $xs)\
+       \        (fold-nested $f ($f $init $x) $xs)))"
+      ),
+      ("lettest $x = let $y = $x + 1\
+       \             in $y"
+      ,"(= (lettest $x) (let $y (+ $x 1) $y))"
       )
     ]
 

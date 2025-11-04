@@ -20,6 +20,7 @@ import Data.Maybe (listToMaybe)
 import Debug.Trace
 
 newtype State = State {sText :: String}
+    deriving (Show)
 
 instance SyntaxState State where
     getText = sText
@@ -69,7 +70,7 @@ anyhWord :: Syntax String
 anyhWord = (some (token (`notElem` forbidden)) <&& optSpace) >>> isoFilter (`notElem` specialList ++ forbidden2)
 
 hnode :: Syntax Atom
-hnode = (text "$" >>> anyhWord >>> variable) <+> (anyhWord >>> symbol) <+> (text "[" <&& optSpace >>> anyExpr <&& text "]" <&& optSpace) <+> parseExprH
+hnode = (text "$" >>> anyhWord >>> variable) <+> (anyhWord >>> symbol) <+> parseExprH
 
 special :: Syntax Atom
 special = anyOf specialList string <&& skipSpace >>> symbol
@@ -83,6 +84,9 @@ expcurry = isoFoldl (expr <<< tolist2)
 cExpr :: Syntax Atom
 cExpr = expcurry <<< (hnode &&& many hnode)
 
+baseExpr :: Syntax Atom
+baseExpr = (expr <<< many hnode) <+> hnode
+
 skipLine :: Syntax ()
 skipLine = ignoreAny [(),()] <<< many (text "\n")
 
@@ -94,7 +98,7 @@ opt1 = skipSpace <&& (ignoreAny (Just ()) <<< optional (text "\n")) <&& optSpace
 
 skip = skipSpace <&& skipLine <&& skipSpace
 
-specialExpr = (cExpr &&& special <&& skip1 &&& anyExpr) >>> handle
+specialExpr = (baseExpr &&& special <&& skip1 &&& anyExpr) >>> handle
     where handle = Iso f g
           f (e1,(s,e2)) = pure $ Expr [s,e1,e2]
           g (Expr [s,e1,e2]) = pure (e1,(s,e2))
@@ -135,16 +139,13 @@ caseBranches = some caseBranch >>> expr
 caseBranch :: Syntax Atom
 caseBranch = syntax parseBranch printBranch
 
-patternExpr :: Syntax Atom
-patternExpr = cExpr
-
 parseBranch :: String -> Either String (Atom, String)
 parseBranch input = do
     let (indent, rest0) = span (`elem` " \n") input
     if null indent
         then Left "expected indentation before case branch"
         else do
-            (patAtom, rest1) <- runSyntax patternExpr rest0
+            (patAtom, rest1) <- runSyntax baseExpr rest0
             let rest2 = dropWhile (== ' ') rest1
             rest3 <- stripArrow rest2
             let (bodyChunk, rest4) = splitBodyText rest3
@@ -153,7 +154,7 @@ parseBranch input = do
 
 printBranch :: Atom -> Either String String
 printBranch (Expr [patAtom, bodyAtom]) = do
-    patText <- renderWith patternExpr patAtom
+    patText <- renderWith baseExpr patAtom
     bodyText <- renderWith anyExpr bodyAtom
     pure ("\n    " ++ patText ++ " -> " ++ bodyText)
 printBranch _ = Left "expected branch expression"
@@ -193,7 +194,7 @@ findNextBranchStart text =
 
 startsWithBranch :: String -> Bool
 startsWithBranch txt =
-    case runSyntax patternExpr txt of
+    case runSyntax baseExpr txt of
         Right (_, rest) ->
             let rest' = dropWhile (== ' ') rest
             in isPrefixOf "->" rest'
@@ -212,10 +213,11 @@ renderWith syn atom =
 rstrip :: String -> String
 rstrip = reverse . dropWhile isSpace . reverse
 
-anyExpr = ifExpr <+> caseExpr <+> specialExpr <+> cExpr
+anyExpr = ifExpr <+> caseExpr <+> specialExpr <+> baseExpr
 
 parseHexpr = (text "!" &&> anyExpr >>> eval) <+> anyExpr
 
+comment :: Syntax ()
 comment = many ((text ";" &&> manyTill anytoken (text "\n") <&& skipLine) >>> ignoreAny "") >>> ignoreAny []
 
 parseFile :: Syntax [Atom]
