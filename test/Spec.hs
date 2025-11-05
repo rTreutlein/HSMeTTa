@@ -36,6 +36,11 @@ fixtures =
       ("lettest $x = let $y = $x + 1\n\
        \             in $y"
       ,"(= (lettest $x) (let $y (+ $x 1) $y))"
+      ),
+      ("let* 1 + 2 = $x\n\
+       \     $y = $x\n\
+       \in $y"
+      ,"(let* ( ( (+ 1 2) $x ) ($y $x) ) $y)"
       )
     ]
 
