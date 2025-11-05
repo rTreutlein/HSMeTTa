@@ -13,9 +13,7 @@ import Control.Arrow
 
 import OpenCog.MeTTa.Lib
 
-import Data.Char (isSpace)
 import Data.List (stripPrefix)
-import Data.Maybe (listToMaybe)
 
 import Debug.Trace
 
@@ -118,18 +116,8 @@ ifExpr = (specialSymbol "if" &&&
 caseExpr :: Syntax Atom
 caseExpr =
     ( specialSymbol "case"
-        &&& ( ((anyExpr <&& caseOf) &&& caseBranches) >>> tolist2 )
+        &&& ( ((anyExpr <&& specialSkip "of") &&& caseBranches) >>> tolist2 )
     ) >>> cons >>> expr
-
-caseOf :: Syntax ()
-caseOf = syntax parse print
-    where
-        parse text =
-            let rest = dropWhile (== ' ') text
-            in case stripPrefix "of" rest of
-                Just remaining -> Right ((), remaining)
-                Nothing -> Left "expected 'of' in case expression"
-        print () = Right " of"
 
 caseBranches :: Syntax Atom
 caseBranches = some caseBranch >>> expr
@@ -156,10 +144,37 @@ letExpr = specialSkip "let" &&> letBinding <&& specialSkip "in" &&& anyExpr >>> 
           g _ = lift $ Left "not a let Expr"
 
 letBinding :: Syntax (Atom,Atom)
-letBinding = (anyExpr  <&& text "=" <&& sepSpace &&& anyExpr)
+letBinding = specialExpr >>> handle
+    where handle = Iso f g
+          f (Expr [Symbol "=",e1,e2]) = pure (e1,e2)
+          f _ = lift $ Left "not a let binding"
+          g (e1,e2) = pure $ Expr [Symbol "=",e1,e2]
+          g _ = lift $ Left "not a let binding"
+
+letStarExpr :: Syntax Atom
+letStarExpr =
+    specialSkip "let*" &&> letStarBindings <&& specialSkip "in" &&& anyExpr >>> handle
+    where
+        handle = Iso f g
+        f (bindings, body) = pure $ Expr [Symbol "let*", bindings, body]
+        g (Expr [Symbol "let*", bindings, body]) = pure (bindings, body)
+        g _ = lift $ Left "not a let* Expr"
+
+letStarBindings :: Syntax Atom
+letStarBindings =
+    (letStarBinding)
+        &&& many (letStarIndent &&> letStarBinding)
+        >>> cons>>> expr
+    where
+        letStarBinding = letBinding >>> tolist2 >>> expr
+
+letStarIndent :: Syntax ()
+letStarIndent =
+    (many (text "\n") >>> ignoreAny [()])
+        &&> (some (text " ") >>> ignoreAny (replicate 4 ()))
 
 anyExpr :: Syntax Atom
-anyExpr = ifExpr <+> caseExpr <+> letExpr <+> specialExpr <+> baseExpr
+anyExpr = ifExpr <+> caseExpr <+> letStarExpr <+> letExpr <+> specialExpr <+> baseExpr
 
 parseHexpr :: Syntax Atom
 parseHexpr = (text "!" &&> anyExpr >>> eval) <+> anyExpr
