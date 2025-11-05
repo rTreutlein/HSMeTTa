@@ -19,21 +19,21 @@ fixtures =
       ( "fun $x = if $x == 1 then a else b"
       , "(= (fun $x) (if (== $x 1) a b))"
       ),
-      ( "fun $x = case $x of\
-        \                Nothing -> a\
+      ( "fun $x = case $x of\n\
+        \                Nothing -> a\n\
         \                (Just $y) -> $y"
       , "(= (fun $x) (case $x ((Nothing a) ((Just $y) $y))))"
       ),
-      ("fold-nested $f $init ( cons $x $xs ) = \
-       \    if is-expr $x\
-       \        then fold-nested $f ( fold-nested $f $init $x ) $xs\
+      ("fold-nested $f $init ( cons $x $xs ) = \n\
+       \    if is-expr $x\n\
+       \        then fold-nested $f ( fold-nested $f $init $x ) $xs\n\
        \        else fold-nested $f ( $f $init $x ) $xs"
-      ,"(= (fold-nested $f $init (cons $x $xs))\
-       \    (if (is-expr $x)\
-       \        (fold-nested $f (fold-nested $f $init $x) $xs)\
+      ,"(= (fold-nested $f $init (cons $x $xs))\n\
+       \    (if (is-expr $x)\n\
+       \        (fold-nested $f (fold-nested $f $init $x) $xs)\n\
        \        (fold-nested $f ($f $init $x) $xs)))"
       ),
-      ("lettest $x = let $y = $x + 1\
+      ("lettest $x = let $y = $x + 1\n\
        \             in $y"
       ,"(= (lettest $x) (let $y (+ $x 1) $y))"
       )
