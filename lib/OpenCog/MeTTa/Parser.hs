@@ -75,17 +75,8 @@ hnode = (text "$" >>> anyhWord >>> variable) <+> (anyhWord >>> symbol) <+> parse
 special :: Syntax Atom
 special = anyOf specialList string <&& skipSpace >>> symbol
 
-basicExpr :: Syntax Atom
-basicExpr = some hnode >>> expr
-
-expcurry :: SynIso (Atom,[Atom]) Atom
-expcurry = isoFoldl (expr <<< tolist2)
-
-cExpr :: Syntax Atom
-cExpr = expcurry <<< (hnode &&& many hnode)
-
 baseExpr :: Syntax Atom
-baseExpr = (expr <<< many hnode) <+> hnode
+baseExpr = some hnode >>> (inverse tolist1 <+> expr)
 
 skipLine :: Syntax ()
 skipLine = ignoreAny [(),()] <<< many (text "\n")
